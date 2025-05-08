@@ -6,6 +6,7 @@ module.exports = {
     password: process.env.DB_PASSWORD || 'qwe123',
     database: process.env.DB_NAME || 'Ctrip',
     host: process.env.DB_HOST || '101.43.95.173',
+    port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
 
   },
@@ -14,6 +15,7 @@ module.exports = {
     password: process.env.DB_PASSWORD || 'qwe123',
     database: process.env.DB_NAME || 'Ctrip',
     host: process.env.DB_HOST || '101.43.95.173',
+    port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
     logging: true,
     logging: false,
