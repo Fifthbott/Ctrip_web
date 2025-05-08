@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  ctrip_api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ctrip_api
+    restart: always
+    env_file: .env
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./src/uploads:/app/src/uploads
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      - ctrip-network
+    ports:
+      - "3000:3000"  # 添加端口映射，方便直接访问API
+
+networks:
+  ctrip-network:
+    external: 
+      name: ctrip-network  # 使用已存在的网络 

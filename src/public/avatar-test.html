@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>文件上传测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            min-height: 100px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>文件上传测试</h1>
+    
+    <div class="card">
+        <h2>标准头像上传</h2>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="token">Authorization Token:</label>
+                <input type="text" id="token" name="token">
+            </div>
+            <div class="form-group">
+                <label for="avatar">头像文件:</label>
+                <input type="file" id="avatar" name="avatar">
+            </div>
+            <button type="submit">上传</button>
+        </form>
+        <div id="result" class="result">
+            <p>结果将显示在这里</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>测试文件上传</h2>
+        <form id="testForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="testToken">Authorization Token:</label>
+                <input type="text" id="testToken" name="token">
+            </div>
+            <div class="form-group">
+                <label for="file">文件:</label>
+                <input type="file" id="file" name="file">
+            </div>
+            <button type="submit">测试上传</button>
+        </form>
+        <div id="testResult" class="result">
+            <p>结果将显示在这里</p>
+        </div>
+    </div>
+    
+    <script>
+        // 标准头像上传
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>上传中...</p>';
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('avatar');
+            const tokenInput = document.getElementById('token');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<p>请选择文件</p>';
+                return;
+            }
+            
+            formData.append('avatar', fileInput.files[0]);
+            
+            try {
+                const headers = {};
+                if (tokenInput.value) {
+                    headers['Authorization'] = tokenInput.value;
+                }
+                
+                console.log('Uploading avatar with field name:', 'avatar');
+                
+                const response = await fetch('/api/users/me/avatar', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                const text = await response.text();
+                let result;
+                try {
+                    result = JSON.parse(text);
+                    resultDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                } catch(e) {
+                    resultDiv.innerHTML = '<p>无法解析响应：</p><pre>' + text + '</pre>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p>错误：' + error.message + '</p>';
+            }
+        });
+        
+        // 测试文件上传
+        document.getElementById('testForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.innerHTML = '<p>上传中...</p>';
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('file');
+            const tokenInput = document.getElementById('testToken');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<p>请选择文件</p>';
+                return;
+            }
+            
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const headers = {};
+                if (tokenInput.value) {
+                    headers['Authorization'] = tokenInput.value;
+                }
+                
+                console.log('Uploading test file with field name:', 'file');
+                
+                const response = await fetch('/api/users/test-upload', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                const text = await response.text();
+                let result;
+                try {
+                    result = JSON.parse(text);
+                    resultDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                } catch(e) {
+                    resultDiv.innerHTML = '<p>无法解析响应：</p><pre>' + text + '</pre>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p>错误：' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html> 

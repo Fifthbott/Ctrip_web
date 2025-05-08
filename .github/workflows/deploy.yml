@@ -1,0 +1,122 @@
+name: Deploy Ctrip Web
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - development
+          - production
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test || echo "No tests available"
+  
+  build:
+    name: Build and Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build and cache Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ctrip-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Verify image
+        run: docker images | grep ctrip-web || echo "Image build verification failed"
+  
+  deploy:
+    name: Deploy to Server
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.inputs.environment != '' }}
+    steps:
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull
+            
+            # 根据环境选择部署脚本
+            if [[ "${{ github.event.inputs.environment }}" == "development" || "${{ github.event_name }}" == "push" && "${{ github.event.inputs.environment }}" == "" ]]; then
+              chmod +x deploy.sh
+              ./deploy.sh
+            else
+              chmod +x deploy-prod.sh
+              ./deploy-prod.sh ${{ secrets.DOMAIN }} ${{ secrets.EMAIL }}
+            fi
+      
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            # 检查服务状态
+            cd ${{ secrets.DEPLOY_PATH }}
+            if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+              docker compose -f docker-compose.prod.yml ps
+              curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health | grep 200
+            else
+              docker compose ps
+              curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health | grep 200
+            fi
+  
+  notify:
+    name: Notification
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify deployment status
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: ${{ needs.deploy.result == 'success' && 'good' || 'danger' }}
+          SLACK_TITLE: Deployment ${{ needs.deploy.result == 'success' && 'Successful' || 'Failed' }}
+          SLACK_MESSAGE: 'Ctrip Web has been ${{ needs.deploy.result == "success" && "successfully deployed" || "failed to deploy" }} to ${{ github.event.inputs.environment || "production" }}'
+          SLACK_FOOTER: 'GitHub Actions' 

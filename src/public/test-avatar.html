@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>头像上传测试</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0 20px;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            padding: 8px 0;
+        }
+        button {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #27ae60;
+        }
+        .preview {
+            max-width: 150px;
+            max-height: 150px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .result {
+            margin-top: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 300px;
+            overflow: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            color: #27ae60;
+        }
+        .error {
+            color: #e74c3c;
+        }
+        .debug-info {
+            font-size: 12px;
+            margin-top: 20px;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>头像上传测试</h1>
+    
+    <div class="card">
+        <div class="card-header">上传/更新头像</div>
+        <div class="card-body">
+            <form id="avatarForm">
+                <div class="form-group">
+                    <label for="authToken">认证令牌</label>
+                    <input type="text" id="authToken" name="token" placeholder="Bearer xxxxxxx" required>
+                </div>
+                <div class="form-group">
+                    <label for="avatar">选择头像图片</label>
+                    <input type="file" id="avatar" name="avatar" accept="image/*" required>
+                    <img id="avatarPreview" class="preview" style="display:none;">
+                </div>
+                <button type="submit">上传头像</button>
+            </form>
+            <div class="result" id="uploadResult">
+                <p>API响应将显示在这里</p>
+            </div>
+            <div class="debug-info" id="debugInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        // 图片预览
+        document.getElementById('avatar').addEventListener('change', function(e) {
+            const preview = document.getElementById('avatarPreview');
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+
+        // 格式化JSON响应
+        function formatResponse(resultElem, data, isSuccess = true) {
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    resultElem.innerHTML = `<pre class="error">${data}</pre>`;
+                    return;
+                }
+            }
+            
+            const statusClass = isSuccess ? 'success' : 'error';
+            resultElem.innerHTML = `<pre class="${statusClass}">${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        // 头像上传表单提交
+        document.getElementById('avatarForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const resultElem = document.getElementById('uploadResult');
+            const debugInfo = document.getElementById('debugInfo');
+            resultElem.innerHTML = '<p>请求处理中...</p>';
+            
+            const formData = new FormData();
+            const file = document.getElementById('avatar').files[0];
+            
+            if (!file) {
+                formatResponse(resultElem, { error: '请选择头像图片' }, false);
+                return;
+            }
+            
+            // 使用正确的字段名 'avatar'
+            formData.append('avatar', file);
+            
+            // 记录调试信息
+            debugInfo.innerHTML = `
+                <strong>请求信息:</strong><br>
+                - 文件名: ${file.name}<br>
+                - 文件类型: ${file.type}<br>
+                - 文件大小: ${Math.round(file.size / 1024)} KB<br>
+                - 字段名: avatar
+            `;
+            
+            try {
+                const token = document.getElementById('authToken').value;
+                const headers = {};
+                if (token) headers['Authorization'] = token;
+                
+                const response = await fetch('/api/users/me/avatar', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                let responseText;
+                try {
+                    responseText = await response.text();
+                    const data = JSON.parse(responseText);
+                    formatResponse(resultElem, data, response.ok);
+                } catch (parseError) {
+                    // 如果无法解析为JSON，直接显示响应文本
+                    resultElem.innerHTML = `<pre class="error">无法解析响应: ${responseText}</pre>`;
+                }
+                
+                // 添加响应状态信息
+                debugInfo.innerHTML += `<br><strong>响应信息:</strong><br>
+                    - 状态码: ${response.status}<br>
+                    - 状态文本: ${response.statusText}
+                `;
+            } catch (error) {
+                formatResponse(resultElem, { error: error.message }, false);
+                debugInfo.innerHTML += `<br><strong>错误:</strong> ${error.message}`;
+            }
+        });
+
+        // 加载保存的token
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                document.getElementById('authToken').value = `Bearer ${token}`;
+            }
+        });
+    </script>
+</body>
+</html> 
