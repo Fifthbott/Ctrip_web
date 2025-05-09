@@ -365,18 +365,13 @@ exports.uploadImages = async (req, res, next) => {
 
     // 使用媒体处理器处理所有上传的图片
     const processPromises = req.files.map(file => processImage(file));
-    const processedResults = await Promise.all(processPromises);
+    const processedFilenames = await Promise.all(processPromises);
     
-    // 构建响应结果
-    const result = {
-      images: processedResults,
-      // 方便前端使用，提供常用尺寸URLs数组
-      image_urls: processedResults.map(r => r.medium),  // 默认使用中等尺寸
-      thumbnails: processedResults.map(r => r.thumb)    // 缩略图
-    };
+    // 构建响应结果 - 只有一种质量的图片
+    const image_urls = processedFilenames.map(filename => `images/${filename}`);
 
     // 返回图片URL
-    return res.success(result, '图片上传并处理成功');
+    return res.success({ image_urls }, '图片上传并处理成功');
   } catch (error) {
     next(error);
   }
@@ -395,11 +390,9 @@ exports.uploadVideo = async (req, res, next) => {
     // 使用媒体处理器处理上传的视频，启用快速响应模式
     const result = await processVideo(req.file, true);
 
-    // 返回视频URL、缩略图URL和处理状态
+    // 返回视频URL和处理状态
     return res.success({
-      video_url: result.video_url,
-      thumbnail_url: result.thumbnail_url,
-      cover_url: result.cover_url,
+      video_url: `videos/${result.video_url}`,
       status: result.status,
       process_id: result.process_id,
       message: '视频已上传，正在后台处理中，您可以继续操作。'

@@ -102,7 +102,8 @@ const getFileUrl = (file, type = 'default') => {
     fileType = type;
   }
   
-  return `${process.env.BASE_URL || ''}/uploads/${fileType}/${file.filename}`;
+  // 返回相对路径，不包含'/uploads'前缀
+  return `${fileType}/${file.filename}`;
 };
 
 // 错误处理中间件
