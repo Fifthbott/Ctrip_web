@@ -110,7 +110,7 @@ const processAvatar = async (file) => {
  * 处理视频 - 只生成标准质量视频
  * @param {Object} file - Multer上传的文件对象
  * @param {Boolean} quickResponse - 是否快速响应（默认为false，即等待处理完成后响应）
- * @returns {Promise<Object>} - 包含视频URL的对象
+ * @returns {Promise<Object>} - 包含视频URL和封面URL的对象
  */
 const processVideo = async (file, quickResponse = false) => {
   try {
@@ -118,9 +118,10 @@ const processVideo = async (file, quickResponse = false) => {
     const processId = uuidv4();
     const uploadDir = path.join(process.cwd(), UPLOAD_PATH, 'videos');
     const tempDir = path.join(process.cwd(), UPLOAD_PATH, 'temp');
+    const coverDir = path.join(process.cwd(), UPLOAD_PATH, 'images'); // 封面存放在images目录
     
     // 确保目录存在
-    [uploadDir, tempDir].forEach(dir => {
+    [uploadDir, tempDir, coverDir].forEach(dir => {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
@@ -132,13 +133,18 @@ const processVideo = async (file, quickResponse = false) => {
     const config = VIDEO_QUALITY;
     const outputPath = path.join(uploadDir, `${processedFilename}.${config.format}`);
     
+    // 封面图片文件名和路径
+    const coverFilename = `${processedFilename}_cover.webp`;
+    const coverPath = path.join(coverDir, coverFilename);
+    
     // 初始化进度跟踪
     progressTracker.set(processId, {
       status: 'preparing',
       progress: 0,
       message: '准备处理视频...',
       created_at: new Date(),
-      filename: processedFilename
+      filename: processedFilename,
+      coverFilename: coverFilename
     });
     
     // 为确保安全，先将原始文件复制到临时目录
@@ -153,14 +159,17 @@ const processVideo = async (file, quickResponse = false) => {
       // 继续处理，不中断流程
     }
     
+    // 提取视频封面
+    await extractVideoCover(tempFilePath, coverPath);
+    
     // 如果需要快速响应
     if (quickResponse) {
       // 在后台继续处理视频
-      processVideoInBackground(tempFilePath, outputPath, processedFilename, config, processId);
-      
+      processVideoInBackground(tempFilePath, outputPath, processedFilename, config, processId, coverFilename);
       // 立即返回处理中的响应
       return {
         video_url: `${processedFilename}.${config.format}`,
+        cover_url: `images/${coverFilename}`,
         status: 'processing',
         process_id: processId
       };
@@ -175,7 +184,8 @@ const processVideo = async (file, quickResponse = false) => {
           progress: 10,
           message: '视频处理中...',
           created_at: new Date(),
-          filename: processedFilename
+          filename: processedFilename,
+          coverFilename: coverFilename
         });
         
         // 处理视频
@@ -199,7 +209,8 @@ const processVideo = async (file, quickResponse = false) => {
                 progress: progressPercent,
                 message: `视频处理中 ${Math.floor(progress.percent)}%...`,
                 created_at: new Date(),
-                filename: processedFilename
+                filename: processedFilename,
+                coverFilename: coverFilename
               });
             }
           })
@@ -217,7 +228,8 @@ const processVideo = async (file, quickResponse = false) => {
               progress: 100,
               message: '处理完成',
               created_at: new Date(),
-              filename: processedFilename
+              filename: processedFilename,
+              coverFilename: coverFilename
             });
             
             // 定时清理进度信息（30分钟后）
@@ -229,6 +241,7 @@ const processVideo = async (file, quickResponse = false) => {
             
             resolve({
               video_url: `${processedFilename}.${config.format}`,
+              cover_url: `images/${coverFilename}`,
               status: 'completed',
               process_id: processId
             });
@@ -239,7 +252,8 @@ const processVideo = async (file, quickResponse = false) => {
               status: 'error', 
               progress: 0, 
               message: '视频处理失败',
-              error: err.message 
+              error: err.message,
+              coverFilename: coverFilename
             });
             
             // 删除临时文件
@@ -279,7 +293,7 @@ const processVideo = async (file, quickResponse = false) => {
  * @param {Object} config - 视频配置
  * @param {string} processId - 进度跟踪ID
  */
-const processVideoInBackground = (inputPath, outputPath, processedFilename, config, processId) => {
+const processVideoInBackground = (inputPath, outputPath, processedFilename, config, processId, coverFilename) => {
   // 创建一个后台处理过程
   (async () => {
     try {
@@ -289,7 +303,8 @@ const processVideoInBackground = (inputPath, outputPath, processedFilename, conf
         progress: 10,
         message: '视频处理中...',
         created_at: new Date(),
-        filename: processedFilename
+        filename: processedFilename,
+        coverFilename: coverFilename
       });
       
       // 处理视频
@@ -314,7 +329,8 @@ const processVideoInBackground = (inputPath, outputPath, processedFilename, conf
                 progress: progressPercent,
                 message: `视频处理中 ${Math.floor(progress.percent)}%...`,
                 created_at: new Date(),
-                filename: processedFilename
+                filename: processedFilename,
+                coverFilename: coverFilename
               });
             }
           })
@@ -336,7 +352,8 @@ const processVideoInBackground = (inputPath, outputPath, processedFilename, conf
         progress: 100,
         message: '处理完成',
         created_at: new Date(),
-        filename: processedFilename
+        filename: processedFilename,
+        coverFilename: coverFilename
       });
       
       // 定时清理进度信息（30分钟后）
@@ -375,9 +392,62 @@ const getVideoProcessProgress = (processId) => {
   return progressTracker.get(processId) || null;
 };
 
+/**
+ * 从视频提取封面图片
+ * @param {string} videoPath - 视频文件路径
+ * @param {string} outputPath - 输出图片路径
+ * @returns {Promise<void>} - Promise
+ */
+const extractVideoCover = (videoPath, outputPath) => {
+  console.log('==== 开始提取视频封面 ====');
+  console.log('视频路径:', videoPath);
+  console.log('输出路径:', outputPath);
+  
+  return new Promise((resolve, reject) => {
+    try {
+      ffmpeg(videoPath)
+        .on('error', (err) => {
+          console.error('==== 提取视频封面失败 ====', err);
+          // 创建一个默认封面，避免整个流程失败
+          try {
+            const defaultCoverPath = path.join(process.cwd(), 'src/public/default-cover.webp');
+            console.log('尝试使用默认封面:', defaultCoverPath);
+            if (fs.existsSync(defaultCoverPath)) {
+              fs.copyFileSync(defaultCoverPath, outputPath);
+              console.log('成功使用默认封面:', outputPath);
+              resolve();
+              return;
+            } else {
+              console.error('默认封面文件不存在');
+            }
+          } catch (copyErr) {
+            console.error('使用默认封面失败:', copyErr);
+          }
+          reject(err);
+        })
+        .on('end', () => {
+          console.log('==== 视频封面提取成功 ====', outputPath);
+          resolve();
+        })
+        .screenshots({
+          timestamps: ['30%'], // 从视频的30%处截取一帧
+          filename: path.basename(outputPath),
+          folder: path.dirname(outputPath),
+          size: '640x?',  // 宽度640，高度自适应
+          format: 'webp', // 使用webp格式
+          fastSeek: true  // 使用快速定位
+        });
+    } catch (err) {
+      console.error('==== 提取视频封面出现异常 ====', err);
+      reject(err);
+    }
+  });
+};
+
 module.exports = {
   processImage,
   processAvatar,
   processVideo,
-  getVideoProcessProgress
+  getVideoProcessProgress,
+  extractVideoCover
 }; 

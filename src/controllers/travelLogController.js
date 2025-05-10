@@ -11,7 +11,7 @@ const { processImage, processVideo, getVideoProcessProgress } = require('../util
  */
 exports.createTravelLog = async (req, res, next) => {
   try {
-    const { title, content, image_urls, video_url, tags } = req.body;
+    const { title, content, image_urls, video_url, cover_url, tags } = req.body;
     const userId = req.user.user_id;
 
     // 创建游记
@@ -21,6 +21,7 @@ exports.createTravelLog = async (req, res, next) => {
       content,
       image_urls: image_urls || [],
       video_url: video_url || null,
+      cover_url: cover_url || null,
       status: 'pending' // 默认状态为待审核
     });
 
@@ -82,7 +83,7 @@ exports.getTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url',
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'created_at', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
@@ -134,7 +135,7 @@ exports.getTravelLog = async (req, res, next) => {
         status: 'approved'
       },
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url',
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
@@ -201,7 +202,7 @@ exports.getMyTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url',
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
@@ -260,7 +261,7 @@ exports.updateTravelLog = async (req, res, next) => {
   try {
     const logId = req.params.id;
     const userId = req.user.user_id;
-    const { title, content, image_urls, video_url, tags } = req.body;
+    const { title, content, image_urls, video_url, cover_url, tags } = req.body;
 
     // 查询游记
     const travelLog = await TravelLog.findByPk(logId);
@@ -285,6 +286,7 @@ exports.updateTravelLog = async (req, res, next) => {
     if (content) travelLog.content = content;
     if (image_urls) travelLog.image_urls = image_urls;
     if (video_url !== undefined) travelLog.video_url = video_url;
+    if (cover_url !== undefined) travelLog.cover_url = cover_url;
     
     // 重置状态为待审核
     travelLog.status = 'pending';
@@ -387,17 +389,38 @@ exports.uploadVideo = async (req, res, next) => {
       return next(new AppError('未提供视频文件', 400));
     }
 
+    console.log('==== 开始处理视频上传 ====');
+    console.log('文件信息:', req.file.filename);
+    
     // 使用媒体处理器处理上传的视频，启用快速响应模式
     const result = await processVideo(req.file, true);
 
-    // 返回视频URL和处理状态
+    console.log('==== 视频处理结果 ====');
+    console.log(JSON.stringify(result, null, 2));
+    
+    // 构建封面URL (如果处理结果中没有，就构造一个)
+    const videoFilename = result.video_url.split('.')[0]; // 移除文件扩展名
+    const coverUrl = result.cover_url || `images/${videoFilename}_cover.webp`;
+    
+    console.log('==== 最终返回数据 ====');
+    console.log({
+      video_url: `videos/${result.video_url}`,
+      cover_url: coverUrl,
+      status: result.status,
+      process_id: result.process_id
+    });
+    
+    // 返回视频URL、封面URL和处理状态
     return res.success({
       video_url: `videos/${result.video_url}`,
+      cover_url: coverUrl,
       status: result.status,
       process_id: result.process_id,
       message: '视频已上传，正在后台处理中，您可以继续操作。'
     }, '视频上传成功');
   } catch (error) {
+    console.error('==== 视频上传处理失败 ====');
+    console.error(error);
     next(error);
   }
 };

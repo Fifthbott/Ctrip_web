@@ -26,7 +26,7 @@ router.get('/health', (req, res) => {
     .then(status => res.json(status))
     .catch(err => {
       console.error('健康检查失败:', err);
-      res.status(500).json({
+    res.status(500).json({
         status: 'error',
         message: '健康检查失败'
       });
@@ -79,8 +79,8 @@ router.get('/api/download/:type/:filename', (req, res) => {
         res.status(500).json({
           status: 'error',
           message: '文件下载失败'
-        });
-      }
+    });
+  }
     }
   });
 });

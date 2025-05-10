@@ -24,11 +24,11 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       whereConditions.status = 'pending';
     }
 
-    // 查询游记列表
+    // 查询游记列表 - 使用原始SQL而不是复杂的关联查询
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url',
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
@@ -36,20 +36,6 @@ exports.getAuditTravelLogs = async (req, res, next) => {
           model: User,
           as: 'author',
           attributes: ['user_id', 'nickname', 'avatar']
-        },
-        {
-          model: TravelLogAudit,
-          as: 'auditRecords',
-          attributes: ['audit_id', 'audit_status', 'reason', 'audit_time'],
-          include: [
-            {
-              model: User,
-              as: 'reviewer',
-              attributes: ['user_id', 'nickname']
-            }
-          ],
-          limit: 1,
-          order: [['audit_time', 'DESC']]
         }
       ],
       limit,
@@ -57,6 +43,44 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       order: [['created_at', 'DESC']],
       distinct: true // 确保count计算正确
     });
+    
+    // 单独查询审核记录，避免复杂的嵌套关联
+    if (travelLogs.length > 0) {
+      const logIds = travelLogs.map(log => log.log_id);
+      
+      // 查询相关的审核记录
+      const auditRecords = await TravelLogAudit.findAll({
+        where: { log_id: logIds },
+        attributes: ['audit_id', 'log_id', 'audit_status', 'reason', 'audit_time', 'reviewer_id'],
+        order: [['audit_time', 'DESC']]
+      });
+      
+      // 查询相关的审核员
+      const reviewerIds = auditRecords.map(record => record.reviewer_id);
+      const reviewers = reviewerIds.length > 0 ? 
+        await User.findAll({
+          where: { user_id: reviewerIds },
+          attributes: ['user_id', 'nickname']
+        }) : [];
+      
+      // 将审核记录和审核员添加到游记中
+      for (const log of travelLogs) {
+        // 找到当前游记的所有审核记录
+        const records = auditRecords.filter(record => record.log_id === log.log_id);
+        
+        // 添加审核员信息到每个审核记录
+        const recordsWithReviewer = records.map(record => {
+          const reviewer = reviewers.find(r => r.user_id === record.reviewer_id);
+          return {
+            ...record.toJSON(),
+            reviewer: reviewer || null
+          };
+        });
+        
+        // 添加审核记录到游记
+        log.setDataValue('auditRecords', recordsWithReviewer);
+      }
+    }
 
     // 返回游记列表
     res.status(200).json({
@@ -84,10 +108,10 @@ exports.getAuditTravelLog = async (req, res, next) => {
   try {
     const logId = req.params.id;
 
-    // 查询游记
+    // 查询游记 - 不使用嵌套关联
     const travelLog = await TravelLog.findByPk(logId, {
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url',
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
@@ -95,25 +119,42 @@ exports.getAuditTravelLog = async (req, res, next) => {
           model: User,
           as: 'author',
           attributes: ['user_id', 'nickname', 'avatar']
-        },
-        {
-          model: TravelLogAudit,
-          as: 'auditRecords',
-          attributes: ['audit_id', 'audit_status', 'reason', 'audit_time'],
-          include: [
-            {
-              model: User,
-              as: 'reviewer',
-              attributes: ['user_id', 'nickname']
-            }
-          ],
-          order: [['audit_time', 'DESC']]
         }
       ]
     });
 
     if (!travelLog) {
       return next(new AppError('游记不存在', 404));
+    }
+    
+    // 单独查询审核记录
+    const auditRecords = await TravelLogAudit.findAll({
+      where: { log_id: logId },
+      attributes: ['audit_id', 'audit_status', 'reason', 'audit_time', 'reviewer_id'],
+      order: [['audit_time', 'DESC']]
+    });
+    
+    // 查询审核员信息
+    if (auditRecords.length > 0) {
+      const reviewerIds = auditRecords.map(record => record.reviewer_id);
+      const reviewers = await User.findAll({
+        where: { user_id: reviewerIds },
+        attributes: ['user_id', 'nickname']
+      });
+      
+      // 添加审核员信息到审核记录
+      const recordsWithReviewer = auditRecords.map(record => {
+        const reviewer = reviewers.find(r => r.user_id === record.reviewer_id);
+        return {
+          ...record.toJSON(),
+          reviewer: reviewer || null
+        };
+      });
+      
+      // 添加审核记录到游记
+      travelLog.setDataValue('auditRecords', recordsWithReviewer);
+    } else {
+      travelLog.setDataValue('auditRecords', []);
     }
 
     // 返回游记详情
