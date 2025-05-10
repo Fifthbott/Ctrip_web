@@ -28,8 +28,7 @@ exports.getAuditTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
-        'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
+        'log_id', 'title', 'content', 'image_urls', 'cover_url', 'status', 'like_count'
       ],
       include: [
         {
@@ -82,11 +81,34 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       }
     }
 
+    // 处理返回数据，只保留第一张图片
+    const simplifiedTravelLogs = travelLogs.map(log => {
+      const plainLog = log.get({ plain: true });
+      
+      // 提取第一张图片URL（如果存在）
+      let firstImageUrl = null;
+      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
+        firstImageUrl = plainLog.image_urls[0];
+      }
+      
+      // 返回简化的游记信息
+      return {
+        log_id: plainLog.log_id,
+        title: plainLog.title,
+        first_image_url: firstImageUrl,
+        cover_url: plainLog.cover_url,
+        status: plainLog.status,
+        like_count: plainLog.like_count,
+        author: plainLog.author,
+        auditRecords: plainLog.auditRecords
+      };
+    });
+
     // 返回游记列表
     res.status(200).json({
       status: 'success',
       data: {
-        travel_logs: travelLogs,
+        travel_logs: simplifiedTravelLogs,
         pagination: {
           total: count,
           page,

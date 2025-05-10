@@ -83,8 +83,7 @@ exports.getTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
-        'created_at', 'comment_count', 'like_count', 'favorite_count'
+        'log_id', 'title', 'image_urls', 'cover_url', 'like_count'
       ],
       include: [
         {
@@ -98,12 +97,6 @@ exports.getTravelLogs = async (req, res, next) => {
             },
             required: false // 设置为 false 表示左连接(LEFT JOIN)
           } : {})
-        },
-        {
-          model: Tag,
-          as: 'tags',
-          attributes: ['tag_id', 'tag_name'],
-          through: { attributes: [] }
         }
       ],
       limit,
@@ -112,9 +105,34 @@ exports.getTravelLogs = async (req, res, next) => {
       distinct: true, // 确保count计算正确
       subQuery: false // 避免Sequelize创建复杂的子查询
     });
+    
+    // 处理返回数据，只保留第一张图片
+    const simplifiedTravelLogs = travelLogs.map(log => {
+      const plainLog = log.get({ plain: true });
+      
+      // 提取第一张图片URL（如果存在）
+      let firstImageUrl = null;
+      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
+        firstImageUrl = plainLog.image_urls[0];
+      }
+      
+      // 返回简化的游记信息
+      return {
+        log_id: plainLog.log_id,
+        title: plainLog.title,
+        first_image_url: firstImageUrl,
+        cover_url: plainLog.cover_url,
+        like_count: plainLog.like_count,
+        author: plainLog.author ? {
+          user_id: plainLog.author.user_id,
+          nickname: plainLog.author.nickname,
+          avatar: plainLog.author.avatar
+        } : null
+      };
+    });
 
     // 返回游记列表，使用分页响应
-    return res.paginate(travelLogs, count, page, limit, '获取游记列表成功');
+    return res.paginate(simplifiedTravelLogs, count, page, limit, '获取游记列表成功');
   } catch (error) {
     next(error);
   }
@@ -202,16 +220,7 @@ exports.getMyTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
-        'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
-      ],
-      include: [
-        {
-          model: Tag,
-          as: 'tags',
-          attributes: ['tag_id', 'tag_name'],
-          through: { attributes: [] }
-        }
+        'log_id', 'title', 'image_urls', 'cover_url', 'status', 'like_count'
       ],
       limit,
       offset,
@@ -219,11 +228,13 @@ exports.getMyTravelLogs = async (req, res, next) => {
     });
 
     // 获取被拒绝游记的审核记录
-    if (travelLogs.some(log => log.status === 'rejected')) {
-      const rejectedLogIds = travelLogs
-        .filter(log => log.status === 'rejected')
-        .map(log => log.log_id);
-      
+    const rejectedLogIds = travelLogs
+      .filter(log => log.status === 'rejected')
+      .map(log => log.log_id);
+    
+    let rejectReasons = {};
+    
+    if (rejectedLogIds.length > 0) {
       // 查询审核记录
       const auditRecords = await TravelLogAudit.findAll({
         where: {
@@ -235,19 +246,43 @@ exports.getMyTravelLogs = async (req, res, next) => {
         group: ['log_id'] // 每个游记只取最新的一条
       });
       
-      // 添加拒绝原因到游记对象
-      travelLogs.forEach(log => {
-        if (log.status === 'rejected') {
-          const auditRecord = auditRecords.find(record => record.log_id === log.log_id);
-          if (auditRecord) {
-            log.setDataValue('reject_reason', auditRecord.reason);
-          }
-        }
-      });
+      // 将拒绝原因保存为映射
+      rejectReasons = auditRecords.reduce((acc, record) => {
+        acc[record.log_id] = record.reason;
+        return acc;
+      }, {});
     }
+    
+    // 处理返回数据，只保留第一张图片
+    const simplifiedTravelLogs = travelLogs.map(log => {
+      const plainLog = log.get({ plain: true });
+      
+      // 提取第一张图片URL（如果存在）
+      let firstImageUrl = null;
+      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
+        firstImageUrl = plainLog.image_urls[0];
+      }
+      
+      // 返回简化的游记信息
+      const result = {
+        log_id: plainLog.log_id,
+        title: plainLog.title,
+        first_image_url: firstImageUrl,
+        cover_url: plainLog.cover_url,
+        status: plainLog.status,
+        like_count: plainLog.like_count
+      };
+      
+      // 如果是被拒绝的游记，添加拒绝原因
+      if (plainLog.status === 'rejected' && rejectReasons[plainLog.log_id]) {
+        result.reject_reason = rejectReasons[plainLog.log_id];
+      }
+      
+      return result;
+    });
 
     // 返回游记列表
-    return res.paginate(travelLogs, count, page, limit, '获取个人游记列表成功');
+    return res.paginate(simplifiedTravelLogs, count, page, limit, '获取个人游记列表成功');
   } catch (error) {
     next(error);
   }
