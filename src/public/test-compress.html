@@ -408,7 +408,6 @@
                 if (response.ok && formattedData.data) {
                     const { 
                         video_url, 
-                        thumbnail_url, 
                         cover_url, 
                         status, 
                         process_id, 
@@ -454,23 +453,6 @@
                                             })
                                             .catch(() => {
                                                 // 封面还没准备好，继续等待
-                                            });
-                                    }
-                                    
-                                    // 检查缩略图是否已生成
-                                    if (status !== 'error' && progress >= 80) {
-                                        fetch(thumbnail_url, { method: 'HEAD' })
-                                            .then(response => {
-                                                if (response.ok) {
-                                                    const thumbImg = document.createElement('img');
-                                                    thumbImg.src = thumbnail_url;
-                                                    thumbImg.className = 'preview';
-                                                    thumbnailContainer.innerHTML = '';
-                                                    thumbnailContainer.appendChild(thumbImg);
-                                                }
-                                            })
-                                            .catch(() => {
-                                                // 缩略图还没准备好，继续等待
                                             });
                                     }
                                     
@@ -520,18 +502,12 @@
                                                 videoPlayer.src = video_url + '?t=' + new Date().getTime();
                                                 videoPlayer.style.display = 'block';
                                                 
-                                                // 显示封面和缩略图
+                                                // 显示封面
                                                 const coverImg = document.createElement('img');
                                                 coverImg.src = cover_url + '?t=' + new Date().getTime();
                                                 coverImg.className = 'preview';
                                                 coverContainer.innerHTML = '';
                                                 coverContainer.appendChild(coverImg);
-                                                
-                                                const thumbImg = document.createElement('img');
-                                                thumbImg.src = thumbnail_url + '?t=' + new Date().getTime();
-                                                thumbImg.className = 'preview';
-                                                thumbnailContainer.innerHTML = '';
-                                                thumbnailContainer.appendChild(thumbImg);
                                             } else {
                                                 // 视频还在处理中，继续轮询
                                                 setTimeout(checkProgress, 3000);
@@ -560,21 +536,13 @@
                         videoPlayer.src = video_url;
                         videoPlayer.style.display = 'block';
                         
-                        // 显示封面和缩略图
+                        // 显示封面
                         if (cover_url) {
                             const coverImg = document.createElement('img');
                             coverImg.src = cover_url;
                             coverImg.className = 'preview';
                             coverContainer.innerHTML = '';
                             coverContainer.appendChild(coverImg);
-                        }
-                        
-                        if (thumbnail_url) {
-                            const thumbImg = document.createElement('img');
-                            thumbImg.src = thumbnail_url;
-                            thumbImg.className = 'preview';
-                            thumbnailContainer.innerHTML = '';
-                            thumbnailContainer.appendChild(thumbImg);
                         }
                     }
                 }

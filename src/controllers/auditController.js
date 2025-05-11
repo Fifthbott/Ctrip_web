@@ -1,9 +1,10 @@
 const { TravelLog, TravelLogAudit, User } = require('../models');
 const { AppError } = require('../middleware/error');
+const { Op } = require('sequelize');
 
 /**
  * 获取待审核游记列表
- * @route GET /api/audit/travel-logs
+ * @route GET /api/audits/travel-logs
  */
 exports.getAuditTravelLogs = async (req, res, next) => {
   try {
@@ -13,22 +14,23 @@ exports.getAuditTravelLogs = async (req, res, next) => {
     const offset = (page - 1) * limit;
     
     // 状态过滤
-    const status = req.query.status || 'pending';
+    const status = req.query.status || 'all';  // 默认获取所有状态
     const whereConditions = {};
     
     if (status && ['pending', 'approved', 'rejected', 'all'].includes(status)) {
       if (status !== 'all') {
         whereConditions.status = status;
       }
-    } else {
-      whereConditions.status = 'pending';
     }
-
-    // 查询游记列表 - 使用原始SQL而不是复杂的关联查询
-    const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
+    
+    // 搜索参数
+    const search = req.query.search || '';
+    
+    // 构建游记查询参数
+    const queryOptions = {
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'cover_url', 'status', 'like_count'
+        'log_id', 'title', 'content', 'image_urls', 'cover_url', 'status', 'like_count','created_at'
       ],
       include: [
         {
@@ -40,8 +42,48 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       limit,
       offset,
       order: [['created_at', 'DESC']],
-      distinct: true // 确保count计算正确
-    });
+      distinct: true, // 确保count计算正确
+      subQuery: false // 避免Sequelize创建复杂的子查询
+    };
+
+    // 如果有搜索内容，创建复合查询条件
+    if (search) {
+      // 创建两种查询情况
+      const contentQuery = {
+        [Op.or]: [
+          { title: { [Op.like]: `%${search}%` } },
+          { content: { [Op.like]: `%${search}%` } }
+        ]
+      };
+      
+      // 通过作者昵称查询的游记ID（需要先查询匹配昵称的用户）
+      const matchingUsers = await User.findAll({
+        where: { nickname: { [Op.like]: `%${search}%` } },
+        attributes: ['user_id']
+      });
+      
+      // 如果找到匹配昵称的用户
+      if (matchingUsers.length > 0) {
+        const authorIds = matchingUsers.map(user => user.user_id);
+        // 合并内容查询和作者ID查询
+        queryOptions.where = {
+          ...whereConditions,
+          [Op.or]: [
+            contentQuery,
+            { user_id: { [Op.in]: authorIds } }
+          ]
+        };
+      } else {
+        // 如果没有匹配的作者，只使用内容查询
+        queryOptions.where = {
+          ...whereConditions,
+          ...contentQuery
+        };
+      }
+    }
+
+    // 执行查询
+    const { count, rows: travelLogs } = await TravelLog.findAndCountAll(queryOptions);
     
     // 单独查询审核记录，避免复杂的嵌套关联
     if (travelLogs.length > 0) {
@@ -81,24 +123,20 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       }
     }
 
-    // 处理返回数据，只保留第一张图片
+    // 处理返回数据
     const simplifiedTravelLogs = travelLogs.map(log => {
       const plainLog = log.get({ plain: true });
       
-      // 提取第一张图片URL（如果存在）
-      let firstImageUrl = null;
-      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
-        firstImageUrl = plainLog.image_urls[0];
-      }
-      
-      // 返回简化的游记信息
+      // 返回游记信息，保留原始数据格式
       return {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        first_image_url: firstImageUrl,
+        image_urls: plainLog.image_urls, // 保留原始图片数组
         cover_url: plainLog.cover_url,
         status: plainLog.status,
         like_count: plainLog.like_count,
+        content: plainLog.content,
+        created_at: plainLog.created_at,
         author: plainLog.author,
         auditRecords: plainLog.auditRecords
       };
@@ -124,7 +162,7 @@ exports.getAuditTravelLogs = async (req, res, next) => {
 
 /**
  * 获取单个游记详情（用于审核）
- * @route GET /api/audit/travel-logs/:id
+ * @route GET /api/audits/travel-logs/:id
  */
 exports.getAuditTravelLog = async (req, res, next) => {
   try {
@@ -193,7 +231,7 @@ exports.getAuditTravelLog = async (req, res, next) => {
 
 /**
  * 审核游记
- * @route POST /api/audit/travel-logs/:id
+ * @route POST /api/audits/travel-logs/:id
  */
 exports.auditTravelLog = async (req, res, next) => {
   try {
@@ -248,7 +286,7 @@ exports.auditTravelLog = async (req, res, next) => {
 
 /**
  * 删除游记（仅管理员）
- * @route DELETE /api/audit/travel-logs/:id
+ * @route DELETE /api/audits/travel-logs/:id
  */
 exports.deleteTravelLog = async (req, res, next) => {
   try {

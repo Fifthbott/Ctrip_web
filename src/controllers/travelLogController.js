@@ -69,10 +69,6 @@ exports.getTravelLogs = async (req, res, next) => {
     // 搜索参数
     const search = req.query.search || '';
     
-    // 基本搜索条件 - 只包含游记状态和标题搜索
-    const whereConditions = {
-      status: 'approved'
-    };
     
     // 如果有搜索内容，添加标题搜索条件
     if (search) {
@@ -106,21 +102,15 @@ exports.getTravelLogs = async (req, res, next) => {
       subQuery: false // 避免Sequelize创建复杂的子查询
     });
     
-    // 处理返回数据，只保留第一张图片
+    // 处理返回数据
     const simplifiedTravelLogs = travelLogs.map(log => {
       const plainLog = log.get({ plain: true });
       
-      // 提取第一张图片URL（如果存在）
-      let firstImageUrl = null;
-      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
-        firstImageUrl = plainLog.image_urls[0];
-      }
-      
-      // 返回简化的游记信息
+      // 返回游记信息，保留原始数据格式
       return {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        first_image_url: firstImageUrl,
+        image_urls: plainLog.image_urls, // 保留原始图片数组
         cover_url: plainLog.cover_url,
         like_count: plainLog.like_count,
         author: plainLog.author ? {
@@ -253,21 +243,15 @@ exports.getMyTravelLogs = async (req, res, next) => {
       }, {});
     }
     
-    // 处理返回数据，只保留第一张图片
+    // 处理返回数据
     const simplifiedTravelLogs = travelLogs.map(log => {
       const plainLog = log.get({ plain: true });
       
-      // 提取第一张图片URL（如果存在）
-      let firstImageUrl = null;
-      if (plainLog.image_urls && plainLog.image_urls.length > 0) {
-        firstImageUrl = plainLog.image_urls[0];
-      }
-      
-      // 返回简化的游记信息
+      // 返回游记信息，保留原始数据格式
       const result = {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        first_image_url: firstImageUrl,
+        image_urls: plainLog.image_urls, // 保留原始图片数组
         cover_url: plainLog.cover_url,
         status: plainLog.status,
         like_count: plainLog.like_count

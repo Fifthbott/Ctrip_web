@@ -42,11 +42,6 @@ const TravelLog = sequelize.define('TravelLog', {
     allowNull: true,
     comment: '视频封面URL（可选）'
   },
-  thumbnail_url: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    comment: '视频缩略图URL（当有视频时使用）'
-  },
   deleted_at: {
     type: DataTypes.DATE,
     allowNull: true,

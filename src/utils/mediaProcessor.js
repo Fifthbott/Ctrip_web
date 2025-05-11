@@ -292,6 +292,7 @@ const processVideo = async (file, quickResponse = false) => {
  * @param {string} processedFilename - 处理后的文件名
  * @param {Object} config - 视频配置
  * @param {string} processId - 进度跟踪ID
+ * @param {string} coverFilename - 封面文件名
  */
 const processVideoInBackground = (inputPath, outputPath, processedFilename, config, processId, coverFilename) => {
   // 创建一个后台处理过程
