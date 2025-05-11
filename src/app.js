@@ -74,6 +74,7 @@ app.use((req, res, next) => {
   const fileUploadPaths = [
     '/api/users/register',
     '/api/users/me/avatar',
+    '/api/users/avatar',
     '/api/travel-logs/upload-images',
     '/api/travel-logs/upload-video'
   ];

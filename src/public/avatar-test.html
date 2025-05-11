@@ -68,6 +68,13 @@
                 <input type="text" id="token" name="token">
             </div>
             <div class="form-group">
+                <label for="apiPath">API路径:</label>
+                <select id="apiPath" name="apiPath">
+                    <option value="/api/users/me/avatar">标准路径 (/api/users/me/avatar)</option>
+                    <option value="/api/users/avatar">替代路径 (/api/users/avatar)</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="avatar">头像文件:</label>
                 <input type="file" id="avatar" name="avatar">
             </div>
@@ -106,6 +113,7 @@
             const formData = new FormData();
             const fileInput = document.getElementById('avatar');
             const tokenInput = document.getElementById('token');
+            const apiPath = document.getElementById('apiPath').value;
             
             if (!fileInput.files[0]) {
                 resultDiv.innerHTML = '<p>请选择文件</p>';
@@ -121,8 +129,9 @@
                 }
                 
                 console.log('Uploading avatar with field name:', 'avatar');
+                console.log('Using API path:', apiPath);
                 
-                const response = await fetch('/api/users/me/avatar', {
+                const response = await fetch(apiPath, {
                     method: 'POST',
                     headers: headers,
                     body: formData

@@ -182,8 +182,6 @@ exports.updateMe = async (req, res, next) => {
  */
 exports.updateAvatar = async (req, res, next) => {
   try {
-    const userId = req.user.user_id;
-
     // 检查是否有文件上传
     if (!req.file) {
       return next(new AppError('未提供头像文件', 400));
@@ -192,33 +190,38 @@ exports.updateAvatar = async (req, res, next) => {
     // 使用媒体处理器压缩头像并转换为webp格式
     const avatarUrl = await processAvatar(req.file);
 
-    // 查找用户
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return next(new AppError('用户不存在', 404));
-    }
+    // 判断是否为认证用户
+    if (req.user && req.user.user_id) {
+      const userId = req.user.user_id;
 
-    // 删除旧头像文件（如果不是默认头像）
-    if (user.avatar !== 'default_avatar.jpg' && user.avatar.startsWith('/uploads/')) {
-      try {
-        const oldAvatarPath = path.join(process.cwd(), user.avatar.substring(1));
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-        }
-      } catch (error) {
-        console.error('删除旧头像失败:', error);
-        // 继续更新，不阻断流程
+      // 查找用户
+      const user = await User.findByPk(userId);
+      if (!user) {
+        return next(new AppError('用户不存在', 404));
       }
+
+      // 删除旧头像文件（如果不是默认头像）
+      if (user.avatar !== 'default_avatar.jpg' && user.avatar.startsWith('/uploads/')) {
+        try {
+          const oldAvatarPath = path.join(process.cwd(), user.avatar.substring(1));
+          if (fs.existsSync(oldAvatarPath)) {
+            fs.unlinkSync(oldAvatarPath);
+          }
+        } catch (error) {
+          console.error('删除旧头像失败:', error);
+          // 继续更新，不阻断流程
+        }
+      }
+
+      // 更新用户头像
+      user.avatar = avatarUrl;
+      await user.save();
     }
 
-    // 更新用户头像
-    user.avatar = avatarUrl;
-    await user.save();
-
-    // 返回更新后的用户信息
+    // 返回上传成功信息 - 无论是否登录
     res.status(200).json({
       status: 'success',
-      message: '头像更新成功',
+      message: '头像上传成功',
       data: {
         avatar: avatarUrl
       }
