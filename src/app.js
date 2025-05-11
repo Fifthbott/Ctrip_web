@@ -65,11 +65,6 @@ const upload = multer();
 app.use((req, res, next) => {
   const contentType = req.headers['content-type'] || '';
   
-  // 打印所有multipart请求的路径，帮助调试
-  if (contentType.includes('multipart/form-data')) {
-    console.log('【路径检查】收到multipart请求:', req.path);
-  }
-  
   // 定义文件上传路径列表
   const fileUploadPaths = [
     '/api/users/register',
@@ -84,32 +79,20 @@ app.use((req, res, next) => {
   
   // 如果是multipart/form-data请求但不是针对文件上传的路由，使用multer处理
   if (contentType.includes('multipart/form-data') && !isFileUploadPath) {
-    console.log('【处理】普通表单数据:', req.path);
-    
     // 使用none()确保只处理文本字段，不处理文件
     upload.none()(req, res, (err) => {
       if (err) {
-        console.error('Multer错误:', err);
         return res.error('表单数据处理错误', 400);
       }
-      
-      // Multer会将表单字段解析到req.body
-      console.log('Form-data请求体:', req.body);
       next();
     });
   } else {
-    if (contentType.includes('multipart/form-data')) {
-      console.log('【跳过】文件上传路径:', req.path);
-    }
     next();
   }
 });
 
 // 请求体解析调试中间件
 app.use((req, res, next) => {
-  if (req.method === 'POST' || req.method === 'PUT') {
-    console.log(`${req.method} ${req.url} 请求体:`, req.body);
-  }
   next();
 });
 

@@ -91,28 +91,10 @@ const uploadAvatar = multer({
 
 // 创建一个头像上传中间件，处理单个头像文件上传，但能处理不同字段名
 const handleAvatarUpload = (req, res, next) => {
-  // 尝试用avatar字段名上传
+  // 简化头像上传处理，无需检查boundary
   uploadAvatar.single('avatar')(req, res, (err) => {
     if (err) {
-      // 如果是意外字段错误，尝试检查请求中的其他字段
-      if (err instanceof multer.MulterError && err.code === 'LIMIT_UNEXPECTED_FILE') {
-        console.log('头像上传字段错误，尝试检查请求内容...');
-        
-        // 从Content-Type获取boundary
-        const contentType = req.headers['content-type'] || '';
-        const boundary = contentType.split('boundary=')[1];
-        
-        if (boundary) {
-          // 打印详细信息以便调试
-          console.log('检测到boundary:', boundary);
-          console.log('请求头:', req.headers);
-        }
-        
-        // 无法自动恢复，返回清晰的错误信息
-        return res.error('上传头像时出错：请确保使用正确的字段名"avatar"', 400, 'FIELD_NAME_ERROR');
-      }
-      
-      // 其他错误由全局错误处理器处理
+      // 直接将错误传递给下一个错误处理中间件
       return next(err);
     }
     
@@ -141,79 +123,14 @@ const getFileUrl = (file, type = 'default') => {
 // 错误处理中间件
 const handleMulterError = (err, req, res, next) => {
   if (err) {
-    console.error('===== 文件上传错误详情开始 =====');
-    console.error('错误对象:', err);
-    console.error('错误名称:', err.name);
-    console.error('错误消息:', err.message);
-    console.error('错误代码:', err.code);
-    console.error('请求路径:', req.path);
-    console.error('Content-Type:', req.headers['content-type']);
-    
-    if (err instanceof multer.MulterError) {
-      console.error('Multer错误字段:', err.field);
-      
-      // 字段错误自动重试处理
-      if (err.code === 'LIMIT_UNEXPECTED_FILE' && req.path.includes('/avatar')) {
-        console.log('检测到头像上传字段错误，尝试重定向处理...');
-        
-        // 获取请求中的文件并手动处理
-        const fieldNames = Object.keys(req.files || {});
-        if (fieldNames.length > 0) {
-          const firstField = fieldNames[0];
-          const fileArray = req.files[firstField];
-          
-          if (fileArray && fileArray.length > 0) {
-            console.log(`从字段 ${firstField} 中找到文件，重新处理为 avatar`);
-            // 手动设置为预期的文件格式
-            req.file = fileArray[0];
-            return next();
-          }
-        }
-      }
-    }
-    
-    // 打印当前请求的字段和文件
-    console.error('请求体字段:', req.body);
-    console.error('请求文件:', req.file || '无文件');
-    console.error('请求多文件:', req.files || '无多文件');
-    console.error('===== 文件上传错误详情结束 =====');
+    console.error('文件上传错误:', err.message);
     
     // 清理可能已经上传的文件
     if (req.file) {
       try {
         fs.unlinkSync(req.file.path);
-        console.log('清理已上传文件:', req.file.path);
       } catch (fileErr) {
         console.error('清理文件失败:', fileErr);
-      }
-    }
-    
-    // 处理多文件情况
-    if (req.files) {
-      if (Array.isArray(req.files)) {
-        req.files.forEach(file => {
-          try {
-            fs.unlinkSync(file.path);
-            console.log('清理已上传文件:', file.path);
-          } catch (fileErr) {
-            console.error('清理文件失败:', fileErr);
-          }
-        });
-      } else if (typeof req.files === 'object') {
-        // 多字段文件上传情况
-        Object.keys(req.files).forEach(fieldname => {
-          const files = req.files[fieldname];
-          if (Array.isArray(files)) {
-            files.forEach(file => {
-              try {
-                fs.unlinkSync(file.path);
-                console.log('清理已上传文件:', file.path);
-              } catch (fileErr) {
-                console.error('清理文件失败:', fileErr);
-              }
-            });
-          }
-        });
       }
     }
     

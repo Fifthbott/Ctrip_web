@@ -208,7 +208,6 @@ exports.updateAvatar = async (req, res, next) => {
             fs.unlinkSync(oldAvatarPath);
           }
         } catch (error) {
-          console.error('删除旧头像失败:', error);
           // 继续更新，不阻断流程
         }
       }

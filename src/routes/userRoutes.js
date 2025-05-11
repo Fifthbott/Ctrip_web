@@ -59,12 +59,6 @@ router.post('/test-upload',
 
 // 头像上传接口（公开，无需认证）
 router.post('/avatar', 
-  (req, res, next) => {
-    console.log('【调试】接收到头像上传请求(公开路径)');
-    console.log('【调试】Content-Type:', req.headers['content-type']);
-    console.log('【调试】请求体:', req.body);
-    next();
-  },
   handleAvatarUpload,
   handleMulterError,
   userController.updateAvatar
@@ -81,12 +75,6 @@ router.put('/me', userValidators.updateUser, userController.updateMe);
 
 // 已认证用户的头像上传/更新
 router.post('/me/avatar', 
-  (req, res, next) => {
-    console.log('【调试】接收到已认证用户头像上传请求');
-    console.log('【调试】Content-Type:', req.headers['content-type']);
-    console.log('【调试】请求体:', req.body);
-    next();
-  },
   handleAvatarUpload,
   handleMulterError,
   userController.updateAvatar
