@@ -13,6 +13,9 @@ exports.getAuditTravelLogs = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
+    // 获取当前审核员ID
+    const reviewerId = req.user.user_id;
+    
     // 状态过滤
     const status = req.query.status || 'all';  // 默认获取所有状态
     const whereConditions = {};
@@ -26,11 +29,47 @@ exports.getAuditTravelLogs = async (req, res, next) => {
     // 搜索参数
     const search = req.query.search || '';
     
+    // 查询所有游记的审核记录
+    const allAuditRecords = await TravelLogAudit.findAll({
+      attributes: ['log_id', 'reviewer_id'],
+      raw: true
+    });
+    
+    // 找出所有有审核记录的游记ID
+    const logIdsWithAudit = [...new Set(allAuditRecords.map(record => record.log_id))];
+    
+    // 找出当前审核员审核过的游记ID
+    const logIdsAuditedByCurrentReviewer = [...new Set(
+      allAuditRecords
+        .filter(record => record.reviewer_id === reviewerId)
+        .map(record => record.log_id)
+    )];
+    
+    // 构建复合查询条件：
+    // 1. 所有未审核的游记（log_id不在logIdsWithAudit中的游记）
+    // 2. 当前审核员审核过的游记（log_id在logIdsAuditedByCurrentReviewer中的游记）
+    const reviewerCondition = {
+      [Op.or]: [
+        { log_id: { [Op.notIn]: logIdsWithAudit } },  // 未审核的游记
+        { log_id: { [Op.in]: logIdsAuditedByCurrentReviewer } }  // 当前审核员审核过的游记
+      ]
+    };
+    
+    // 如果logIdsWithAudit为空数组，Sequelize会抛出错误，需要特殊处理
+    if (logIdsWithAudit.length === 0) {
+      // 如果没有任何审核记录，则所有游记都是未审核的
+      delete reviewerCondition[Op.or];
+    }
+    
+    // 更新查询条件
+    whereConditions.deleted_at = null; // 排除已删除的游记
+    whereConditions[Op.and] = reviewerCondition;
+    
     // 构建游记查询参数
     const queryOptions = {
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'content', 'image_urls', 'cover_url', 'status', 'like_count','created_at'
+        'log_id', 'title', 'content', 'image_urls', 'cover_url', 'status', 'like_count', 'created_at'
       ],
       include: [
         {
@@ -66,20 +105,30 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       if (matchingUsers.length > 0) {
         const authorIds = matchingUsers.map(user => user.user_id);
         // 合并内容查询和作者ID查询
-        queryOptions.where = {
-          ...whereConditions,
+        const searchCondition = {
           [Op.or]: [
             contentQuery,
             { user_id: { [Op.in]: authorIds } }
           ]
         };
+        
+        // 合并已有的查询条件和搜索条件
+        if (whereConditions[Op.and]) {
+          whereConditions[Op.and] = [whereConditions[Op.and], searchCondition];
+        } else {
+          whereConditions[Op.and] = searchCondition;
+        }
       } else {
         // 如果没有匹配的作者，只使用内容查询
-        queryOptions.where = {
-          ...whereConditions,
-          ...contentQuery
-        };
+        if (whereConditions[Op.and]) {
+          whereConditions[Op.and] = [whereConditions[Op.and], contentQuery];
+        } else {
+          whereConditions[Op.and] = contentQuery;
+        }
       }
+      
+      // 更新查询选项的where条件
+      queryOptions.where = whereConditions;
     }
 
     // 执行查询
@@ -131,7 +180,7 @@ exports.getAuditTravelLogs = async (req, res, next) => {
       return {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        image_urls: plainLog.image_urls, // 保留原始图片数组
+        image_urls: plainLog.image_urls,
         cover_url: plainLog.cover_url,
         status: plainLog.status,
         like_count: plainLog.like_count,
