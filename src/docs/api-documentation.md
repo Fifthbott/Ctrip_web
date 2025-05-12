@@ -489,33 +489,59 @@ Authorization: Bearer <token>
 ```json
 {
   "status": "success",
-  "message": "获取我的游记列表成功",
+  "message": "获取个人游记列表成功",
   "data": {
     "items": [
       {
         "log_id": 1,
         "title": "北京三日游",
-        "content": "这是一篇关于北京三日游的游记...",
+        "content": "这是一篇关于北京三日游的游记内容...",
         "image_urls": ["url1.jpg", "url2.jpg"],
         "video_url": "video1.mp4",
-        "status": "approved",
+        "cover_url": "cover1.jpg",
+        "status": "rejected",
         "created_at": "2023-07-01T12:34:56.789Z",
         "updated_at": "2023-07-02T10:11:12.789Z",
-        "comment_count": 5,
-        "like_count": 10,
-        "favorite_count": 3,
+        "like_count": 0,
+        "comment_count": 0,
+        "favorite_count": 0,
         "tags": [
           {"tag_id": 1, "tag_name": "北京"},
           {"tag_id": 2, "tag_name": "旅游"}
-        ]
+        ],
+        "audit_info": {
+          "reject_reason": "图片质量不佳，请提供更清晰的图片",
+          "audit_time": "2023-07-02T15:20:30.789Z",
+          "reviewer": {
+            "user_id": 3,
+            "nickname": "审核员A"
+          }
+        }
       },
-      // 更多游记...
+      {
+        "log_id": 2,
+        "title": "上海两日游",
+        "content": "这是一篇关于上海两日游的游记内容...",
+        "image_urls": ["url3.jpg", "url4.jpg"],
+        "video_url": null,
+        "cover_url": "cover2.jpg",
+        "status": "pending",
+        "created_at": "2023-07-05T09:10:11.789Z",
+        "updated_at": "2023-07-05T09:10:11.789Z",
+        "like_count": 0,
+        "comment_count": 0,
+        "favorite_count": 0,
+        "tags": [
+          {"tag_id": 3, "tag_name": "上海"},
+          {"tag_id": 4, "tag_name": "美食"}
+        ]
+      }
     ],
     "pagination": {
-      "total": 15,
+      "total": 7,
       "page": 1,
       "limit": 10,
-      "pages": 2
+      "pages": 1
     }
   }
 }

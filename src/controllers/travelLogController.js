@@ -210,7 +210,16 @@ exports.getMyTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'image_urls', 'cover_url', 'status', 'like_count'
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url', 
+        'status', 'created_at', 'updated_at', 'like_count', 'comment_count', 'favorite_count'
+      ],
+      include: [
+        {
+          model: Tag,
+          as: 'tags',
+          attributes: ['tag_id', 'tag_name'],
+          through: { attributes: [] }
+        }
       ],
       limit,
       offset,
@@ -222,23 +231,31 @@ exports.getMyTravelLogs = async (req, res, next) => {
       .filter(log => log.status === 'rejected')
       .map(log => log.log_id);
     
-    let rejectReasons = {};
+    let auditRecords = {};
     
     if (rejectedLogIds.length > 0) {
       // 查询审核记录
-      const auditRecords = await TravelLogAudit.findAll({
+      const audits = await TravelLogAudit.findAll({
         where: {
           log_id: rejectedLogIds,
           audit_status: 'rejected'
         },
-        attributes: ['log_id', 'reason'],
-        order: [['audit_time', 'DESC']],
-        group: ['log_id'] // 每个游记只取最新的一条
+        attributes: ['log_id', 'audit_id', 'reason', 'audit_time'],
+        include: [
+          {
+            model: User,
+            as: 'reviewer',
+            attributes: ['user_id', 'nickname']
+          }
+        ],
+        order: [['audit_time', 'DESC']]
       });
       
-      // 将拒绝原因保存为映射
-      rejectReasons = auditRecords.reduce((acc, record) => {
-        acc[record.log_id] = record.reason;
+      // 对每个游记保存最新的审核记录
+      auditRecords = audits.reduce((acc, record) => {
+        if (!acc[record.log_id] || new Date(record.audit_time) > new Date(acc[record.log_id].audit_time)) {
+          acc[record.log_id] = record;
+        }
         return acc;
       }, {});
     }
@@ -251,15 +268,30 @@ exports.getMyTravelLogs = async (req, res, next) => {
       const result = {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        image_urls: plainLog.image_urls, // 保留原始图片数组
+        content: plainLog.content,
+        image_urls: plainLog.image_urls,
+        video_url: plainLog.video_url,
         cover_url: plainLog.cover_url,
         status: plainLog.status,
-        like_count: plainLog.like_count
+        created_at: plainLog.created_at,
+        updated_at: plainLog.updated_at,
+        like_count: plainLog.like_count,
+        comment_count: plainLog.comment_count,
+        favorite_count: plainLog.favorite_count,
+        tags: plainLog.tags || []
       };
       
-      // 如果是被拒绝的游记，添加拒绝原因
-      if (plainLog.status === 'rejected' && rejectReasons[plainLog.log_id]) {
-        result.reject_reason = rejectReasons[plainLog.log_id];
+      // 如果是被拒绝的游记，添加审核记录
+      if (plainLog.status === 'rejected' && auditRecords[plainLog.log_id]) {
+        const auditRecord = auditRecords[plainLog.log_id];
+        result.audit_info = {
+          reject_reason: auditRecord.reason,
+          audit_time: auditRecord.audit_time,
+          reviewer: auditRecord.reviewer ? {
+            user_id: auditRecord.reviewer.user_id,
+            nickname: auditRecord.reviewer.nickname
+          } : null
+        };
       }
       
       return result;
