@@ -69,6 +69,11 @@ exports.getTravelLogs = async (req, res, next) => {
     // 搜索参数
     const search = req.query.search || '';
     
+    // 定义查询条件
+    const whereConditions = {
+      status: 'approved',  // 只获取已审核通过的游记
+      deleted_at: null     // 不包括已删除的游记
+    };
     
     // 如果有搜索内容，添加标题搜索条件
     if (search) {
@@ -226,21 +231,19 @@ exports.getMyTravelLogs = async (req, res, next) => {
       order: [['created_at', 'DESC']]
     });
 
-    // 获取被拒绝游记的审核记录
-    const rejectedLogIds = travelLogs
-      .filter(log => log.status === 'rejected')
-      .map(log => log.log_id);
+    // 获取所有有审核记录的游记ID
+    const allLogIds = travelLogs.map(log => log.log_id);
     
-    let auditRecords = {};
+    // 审核记录映射，键为游记ID，值为该游记的审核记录数组
+    let auditRecordsByLogId = {};
     
-    if (rejectedLogIds.length > 0) {
-      // 查询审核记录
+    if (allLogIds.length > 0) {
+      // 查询所有游记的审核记录
       const audits = await TravelLogAudit.findAll({
         where: {
-          log_id: rejectedLogIds,
-          audit_status: 'rejected'
+          log_id: allLogIds
         },
-        attributes: ['log_id', 'audit_id', 'reason', 'audit_time'],
+        attributes: ['log_id', 'audit_id', 'audit_status', 'reason', 'audit_time'],
         include: [
           {
             model: User,
@@ -251,11 +254,21 @@ exports.getMyTravelLogs = async (req, res, next) => {
         order: [['audit_time', 'DESC']]
       });
       
-      // 对每个游记保存最新的审核记录
-      auditRecords = audits.reduce((acc, record) => {
-        if (!acc[record.log_id] || new Date(record.audit_time) > new Date(acc[record.log_id].audit_time)) {
-          acc[record.log_id] = record;
+      // 按游记ID组织审核记录
+      auditRecordsByLogId = audits.reduce((acc, record) => {
+        if (!acc[record.log_id]) {
+          acc[record.log_id] = [];
         }
+        acc[record.log_id].push({
+          audit_id: record.audit_id,
+          audit_status: record.audit_status,
+          reason: record.reason,
+          audit_time: record.audit_time,
+          reviewer: record.reviewer ? {
+            user_id: record.reviewer.user_id,
+            nickname: record.reviewer.nickname
+          } : null
+        });
         return acc;
       }, {});
     }
@@ -281,17 +294,21 @@ exports.getMyTravelLogs = async (req, res, next) => {
         tags: plainLog.tags || []
       };
       
-      // 如果是被拒绝的游记，添加审核记录
-      if (plainLog.status === 'rejected' && auditRecords[plainLog.log_id]) {
-        const auditRecord = auditRecords[plainLog.log_id];
-        result.audit_info = {
-          reject_reason: auditRecord.reason,
-          audit_time: auditRecord.audit_time,
-          reviewer: auditRecord.reviewer ? {
-            user_id: auditRecord.reviewer.user_id,
-            nickname: auditRecord.reviewer.nickname
-          } : null
-        };
+      // 添加游记审核历史记录
+      if (auditRecordsByLogId[plainLog.log_id] && auditRecordsByLogId[plainLog.log_id].length > 0) {
+        result.audit_history = auditRecordsByLogId[plainLog.log_id];
+        
+        // 为便于前端处理，保留兼容旧版的审核信息结构（最新的拒绝记录）
+        if (plainLog.status === 'rejected') {
+          const latestRejectRecord = auditRecordsByLogId[plainLog.log_id].find(r => r.audit_status === 'rejected');
+          if (latestRejectRecord) {
+            result.audit_info = {
+              reject_reason: latestRejectRecord.reason,
+              audit_time: latestRejectRecord.audit_time,
+              reviewer: latestRejectRecord.reviewer
+            };
+          }
+        }
       }
       
       return result;

@@ -516,7 +516,29 @@ Authorization: Bearer <token>
             "user_id": 3,
             "nickname": "审核员A"
           }
-        }
+        },
+        "audit_history": [
+          {
+            "audit_id": 5,
+            "audit_status": "rejected",
+            "reason": "图片质量不佳，请提供更清晰的图片",
+            "audit_time": "2023-07-02T15:20:30.789Z",
+            "reviewer": {
+              "user_id": 3,
+              "nickname": "审核员A"
+            }
+          },
+          {
+            "audit_id": 3,
+            "audit_status": "rejected",
+            "reason": "内容不符合规范，请修改不当用语",
+            "audit_time": "2023-07-01T18:15:20.789Z",
+            "reviewer": {
+              "user_id": 4,
+              "nickname": "审核员B"
+            }
+          }
+        ]
       },
       {
         "log_id": 2,
@@ -525,7 +547,7 @@ Authorization: Bearer <token>
         "image_urls": ["url3.jpg", "url4.jpg"],
         "video_url": null,
         "cover_url": "cover2.jpg",
-        "status": "pending",
+        "status": "approved",
         "created_at": "2023-07-05T09:10:11.789Z",
         "updated_at": "2023-07-05T09:10:11.789Z",
         "like_count": 0,
@@ -534,6 +556,18 @@ Authorization: Bearer <token>
         "tags": [
           {"tag_id": 3, "tag_name": "上海"},
           {"tag_id": 4, "tag_name": "美食"}
+        ],
+        "audit_history": [
+          {
+            "audit_id": 8,
+            "audit_status": "approved",
+            "reason": null,
+            "audit_time": "2023-07-05T10:30:00.789Z",
+            "reviewer": {
+              "user_id": 3,
+              "nickname": "审核员A"
+            }
+          }
         ]
       }
     ],
