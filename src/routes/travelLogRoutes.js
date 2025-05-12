@@ -20,6 +20,9 @@ router.use(authenticate);
 // 我的游记 - 放在使用:id参数的路由前面
 router.get('/me', travelLogController.getMyTravelLogs);
 
+// 获取当前用户的游记详情 - 路径上区分于公开游记详情
+router.get('/me/:id', travelLogValidators.validateTravelLogId, travelLogController.getMyTravelLogDetail);
+
 // 文件上传
 router.post('/upload-images', 
   uploadImage.array('images', 10), 

@@ -520,4 +520,107 @@ exports.getVideoProgress = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * 获取当前用户的游记详情
+ * @route GET /api/travel-logs/me/:id
+ */
+exports.getMyTravelLogDetail = async (req, res, next) => {
+  try {
+    const logId = req.params.id;
+    const userId = req.user.user_id;
+
+    // 查询游记，确保是当前用户自己的游记
+    const travelLog = await TravelLog.findOne({
+      where: {
+        log_id: logId,
+        user_id: userId
+      },
+      attributes: [
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
+        'status', 'created_at', 'updated_at', 'comment_count', 'like_count', 'favorite_count'
+      ],
+      include: [
+        {
+          model: Tag,
+          as: 'tags',
+          attributes: ['tag_id', 'tag_name'],
+          through: { attributes: [] }
+        },
+        {
+          model: Comment,
+          as: 'comments',
+          attributes: ['comment_id', 'content', 'created_at'],
+          include: [
+            {
+              model: User,
+              as: 'author',
+              attributes: ['user_id', 'nickname', 'avatar']
+            }
+          ],
+          limit: 10,
+          order: [['created_at', 'DESC']]
+        }
+      ]
+    });
+
+    if (!travelLog) {
+      return next(new AppError('游记不存在或不属于您', 404));
+    }
+
+    // 查询游记的审核记录
+    const auditRecords = await TravelLogAudit.findAll({
+      where: {
+        log_id: logId
+      },
+      attributes: ['audit_id', 'audit_status', 'reason', 'audit_time'],
+      include: [
+        {
+          model: User,
+          as: 'reviewer',
+          attributes: ['user_id', 'nickname']
+        }
+      ],
+      order: [['audit_time', 'DESC']]
+    });
+
+    // 转换为普通对象
+    const plainLog = travelLog.get({ plain: true });
+    
+    // 构建响应数据
+    const result = {
+      ...plainLog,
+      auditRecords: auditRecords.map(record => ({
+        audit_id: record.audit_id,
+        audit_status: record.audit_status,
+        reason: record.reason,
+        audit_time: record.audit_time,
+        reviewer: record.reviewer ? {
+          user_id: record.reviewer.user_id,
+          nickname: record.reviewer.nickname
+        } : null
+      }))
+    };
+    
+    // 为便于前端处理，添加拒绝信息（如果状态为拒绝）
+    if (plainLog.status === 'rejected' && auditRecords.length > 0) {
+      const latestRejectRecord = auditRecords.find(r => r.audit_status === 'rejected');
+      if (latestRejectRecord) {
+        result.audit_info = {
+          reject_reason: latestRejectRecord.reason,
+          audit_time: latestRejectRecord.audit_time,
+          reviewer: latestRejectRecord.reviewer ? {
+            user_id: latestRejectRecord.reviewer.user_id,
+            nickname: latestRejectRecord.reviewer.nickname
+          } : null
+        };
+      }
+    }
+
+    // 返回游记详情
+    return res.success({ travel_log: result }, '获取游记详情成功');
+  } catch (error) {
+    next(error);
+  }
 }; 
