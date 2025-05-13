@@ -116,7 +116,7 @@ Authorization: Bearer <token>
       "user_id": 1,
       "username": "example_user",
       "nickname": "旅行者",
-      "avatar": "default_avatar.jpg",
+      "avatar": "avatars/default_avatar.jpg",
       "role": "user"
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -149,7 +149,7 @@ Authorization: Bearer <token>
       "user_id": 1,
       "username": "example_user",
       "nickname": "旅行者",
-      "avatar": "default_avatar.jpg",
+      "avatar": "avatars/default_avatar.jpg",
       "role": "user"
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -174,7 +174,7 @@ Authorization: Bearer <token>
       "user_id": 1,
       "username": "example_user",
       "nickname": "旅行者",
-      "avatar": "default_avatar.jpg",
+      "avatar": "avatars/default_avatar.jpg",
       "role": "user",
       "status": "active",
       "created_at": "2023-07-01T12:34:56.789Z"
@@ -241,7 +241,7 @@ Authorization: Bearer <token>
         "user_id": 1,
         "username": "example_user",
         "nickname": "旅行者",
-        "avatar": "default_avatar.jpg",
+        "avatar": "avatars/default_avatar.jpg",
         "role": "user",
         "status": "active",
         "created_at": "2023-07-01T12:34:56.789Z"

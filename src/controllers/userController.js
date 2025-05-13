@@ -28,7 +28,7 @@ exports.register = async (req, res, next) => {
     }
 
     // 处理头像
-    let avatar = 'default_avatar.jpg'; // 默认头像
+    let avatar = 'avatars/default_avatar.jpg'; // 默认头像
     if (req.file) {
       try {
         // 使用媒体处理器压缩头像并转换为webp格式
@@ -221,7 +221,7 @@ exports.updateAvatar = async (req, res, next) => {
       }
 
       // 删除旧头像文件（如果不是默认头像）
-      if (user.avatar !== 'default_avatar.jpg' && user.avatar.startsWith('/uploads/')) {
+      if (user.avatar !== 'avatars/default_avatar.jpg' && user.avatar.startsWith('/uploads/')) {
         try {
           const oldAvatarPath = path.join(process.cwd(), user.avatar.substring(1));
           if (fs.existsSync(oldAvatarPath)) {

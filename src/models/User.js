@@ -27,7 +27,7 @@ const User = sequelize.define('User', {
   },
   avatar: {
     type: DataTypes.STRING(255),
-    defaultValue: 'default_avatar.jpg',
+    defaultValue: 'avatars/default_avatar.jpg',
     comment: '用户头像（URL），默认头像'
   },
   role: {
