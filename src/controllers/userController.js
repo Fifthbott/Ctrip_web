@@ -21,6 +21,12 @@ exports.register = async (req, res, next) => {
       return next(new AppError('用户名已被使用', 400));
     }
 
+    // 检查昵称是否已存在
+    const existingNickname = await User.findOne({ where: { nickname } });
+    if (existingNickname) {
+      return next(new AppError('昵称已被使用', 400));
+    }
+
     // 处理头像
     let avatar = 'default_avatar.jpg'; // 默认头像
     if (req.file) {
@@ -149,6 +155,20 @@ exports.updateMe = async (req, res, next) => {
     const user = await User.findByPk(userId);
     if (!user) {
       return next(new AppError('用户不存在', 404));
+    }
+
+    // 如果要更新昵称，检查昵称是否已被其他用户使用
+    if (nickname && nickname !== user.nickname) {
+      const existingNickname = await User.findOne({ 
+        where: { 
+          nickname,
+          user_id: { [require('sequelize').Op.ne]: userId } // 排除当前用户
+        } 
+      });
+      
+      if (existingNickname) {
+        return next(new AppError('昵称已被使用', 400));
+      }
     }
 
     // 更新用户信息
