@@ -32,7 +32,9 @@ exports.register = async (req, res, next) => {
     if (req.file) {
       try {
         // 使用媒体处理器压缩头像并转换为webp格式
-        avatar = await processAvatar(req.file);
+        const processedFilename = await processAvatar(req.file);
+        avatar = `avatars/${processedFilename}`;
+        console.log('处理后的头像路径:', avatar);
       } catch (error) {
         console.error('头像处理失败:', error);
         // 使用默认头像，继续注册流程
@@ -208,7 +210,9 @@ exports.updateAvatar = async (req, res, next) => {
     }
 
     // 使用媒体处理器压缩头像并转换为webp格式
-    const avatarUrl = await processAvatar(req.file);
+    const processedFilename = await processAvatar(req.file);
+    const avatarUrl = `avatars/${processedFilename}`;
+    console.log('更新后的头像路径:', avatarUrl);
 
     // 判断是否为认证用户
     if (req.user && req.user.user_id) {
@@ -221,13 +225,19 @@ exports.updateAvatar = async (req, res, next) => {
       }
 
       // 删除旧头像文件（如果不是默认头像）
-      if (user.avatar !== 'avatars/default_avatar.jpg' && user.avatar.startsWith('/uploads/')) {
+      if (user.avatar !== 'avatars/default_avatar.jpg') {
         try {
-          const oldAvatarPath = path.join(process.cwd(), user.avatar.substring(1));
+          // 构建完整的头像文件路径
+          const UPLOAD_PATH = process.env.UPLOAD_PATH || 'src/uploads';
+          const oldAvatarPath = path.join(process.cwd(), UPLOAD_PATH, user.avatar);
+          
+          console.log('尝试删除旧头像:', oldAvatarPath);
           if (fs.existsSync(oldAvatarPath)) {
             fs.unlinkSync(oldAvatarPath);
+            console.log('成功删除旧头像');
           }
         } catch (error) {
+          console.warn('删除旧头像失败:', error.message);
           // 继续更新，不阻断流程
         }
       }
