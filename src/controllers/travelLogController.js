@@ -84,7 +84,8 @@ exports.getTravelLogs = async (req, res, next) => {
     const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
       where: whereConditions,
       attributes: [
-        'log_id', 'title', 'image_urls', 'cover_url', 'like_count'
+        'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
+        'created_at', 'updated_at', 'status', 'comment_count', 'like_count', 'favorite_count'
       ],
       include: [
         {
@@ -98,6 +99,12 @@ exports.getTravelLogs = async (req, res, next) => {
             },
             required: false // 设置为 false 表示左连接(LEFT JOIN)
           } : {})
+        },
+        {
+          model: Tag,
+          as: 'tags',
+          attributes: ['tag_id', 'tag_name'],
+          through: { attributes: [] }
         }
       ],
       limit,
@@ -115,9 +122,17 @@ exports.getTravelLogs = async (req, res, next) => {
       return {
         log_id: plainLog.log_id,
         title: plainLog.title,
-        image_urls: plainLog.image_urls, // 保留原始图片数组
+        content: plainLog.content,
+        image_urls: plainLog.image_urls,
+        video_url: plainLog.video_url,
         cover_url: plainLog.cover_url,
+        status: plainLog.status,
+        created_at: plainLog.created_at,
+        updated_at: plainLog.updated_at,
+        comment_count: plainLog.comment_count,
         like_count: plainLog.like_count,
+        favorite_count: plainLog.favorite_count,
+        tags: plainLog.tags || [],
         author: plainLog.author ? {
           user_id: plainLog.author.user_id,
           nickname: plainLog.author.nickname,
@@ -126,8 +141,20 @@ exports.getTravelLogs = async (req, res, next) => {
       };
     });
 
-    // 返回游记列表，使用分页响应
-    return res.paginate(simplifiedTravelLogs, count, page, limit, '获取游记列表成功');
+    // 返回游记列表，使用新的响应格式
+    return res.status(200).json({
+      status: 'success',
+      message: '获取游记列表成功',
+      data: {
+        travel_logs: simplifiedTravelLogs,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          pages: Math.ceil(count / limit)
+        }
+      }
+    });
   } catch (error) {
     next(error);
   }
