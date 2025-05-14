@@ -18,10 +18,45 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * @route GET /api
+ * @description API路径
+ * @access Public
+ */
+router.get('/api', (req, res) => {
+  res.json({
+    message: 'Ctrip Travel Diary API',
+    version: '1.0.0',
+    documentation: '/api/docs',
+    endpoints: {
+      users: '/api/users',
+      travelLogs: '/api/travel-logs',
+      comments: '/api/comments',
+      health: '/api/health'
+    }
+  });
+});
+
+/**
  * 服务器状态检查
  * @route GET /health
  */
 router.get('/health', (req, res) => {
+  healthCheck()
+    .then(status => res.json(status))
+    .catch(err => {
+      console.error('健康检查失败:', err);
+    res.status(500).json({
+        status: 'error',
+        message: '健康检查失败'
+      });
+    });
+});
+
+/**
+ * 服务器状态检查 - API路径版本
+ * @route GET /api/health
+ */
+router.get('/api/health', (req, res) => {
   healthCheck()
     .then(status => res.json(status))
     .catch(err => {
