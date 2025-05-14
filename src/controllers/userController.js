@@ -13,7 +13,7 @@ const fs = require('fs');
  */
 exports.register = async (req, res, next) => {
   try {
-    const { username, password, nickname } = req.body;
+    const { username, password, nickname,avatar } = req.body;
     
     // 检查用户名是否已存在
     const existingUser = await User.findOne({ where: { username } });
@@ -28,19 +28,13 @@ exports.register = async (req, res, next) => {
     }
 
     // 处理头像
-    let avatar = 'avatars/default_avatar.jpg'; // 默认头像
-    if (req.file) {
-      try {
-        // 使用媒体处理器压缩头像并转换为webp格式
-        const processedFilename = await processAvatar(req.file);
-        avatar = `avatars/${processedFilename}`;
-        console.log('处理后的头像路径:', avatar);
-      } catch (error) {
-        console.error('头像处理失败:', error);
-        // 使用默认头像，继续注册流程
-      }
+    let default_avatar = 'avatars/default_avatar.jpg'; // 默认头像
+    let target_avatar = '';
+    if(!avatar||avatar===''){
+        target_avatar = default_avatar;
+    }else{
+        target_avatar = avatar;
     }
-
     // 创建新用户
     const user = await User.create({
       username,
