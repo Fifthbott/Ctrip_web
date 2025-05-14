@@ -69,20 +69,14 @@ exports.getTravelLogs = async (req, res, next) => {
     // 搜索参数
     const search = req.query.search || '';
     
-    // 定义查询条件
-    const whereConditions = {
+    // 定义基本查询条件
+    const baseConditions = {
       status: 'approved',  // 只获取已审核通过的游记
       deleted_at: null     // 不包括已删除的游记
     };
     
-    // 如果有搜索内容，添加标题搜索条件
-    if (search) {
-      whereConditions.title = { [Op.like]: `%${search}%` };
-    }
-
-    // 查询游记列表
-    const { count, rows: travelLogs } = await TravelLog.findAndCountAll({
-      where: whereConditions,
+    // 准备查询参数
+    let queryOptions = {
       attributes: [
         'log_id', 'title', 'content', 'image_urls', 'video_url', 'cover_url',
         'created_at', 'updated_at', 'status', 'comment_count', 'like_count', 'favorite_count'
@@ -92,13 +86,6 @@ exports.getTravelLogs = async (req, res, next) => {
           model: User,
           as: 'author',
           attributes: ['user_id', 'nickname', 'avatar'],
-          // 如果有搜索内容，添加作者昵称搜索条件
-          ...(search ? {
-            where: {
-              nickname: { [Op.like]: `%${search}%` }
-            },
-            required: false // 设置为 false 表示左连接(LEFT JOIN)
-          } : {})
         },
         {
           model: Tag,
@@ -112,7 +99,34 @@ exports.getTravelLogs = async (req, res, next) => {
       order: [['created_at', 'DESC']],
       distinct: true, // 确保count计算正确
       subQuery: false // 避免Sequelize创建复杂的子查询
-    });
+    };
+
+    // 如果有搜索内容
+    if (search) {
+      // 查询匹配nickname的用户
+      const matchingUsers = await User.findAll({
+        where: { nickname: { [Op.like]: `%${search}%` } },
+        attributes: ['user_id']
+      });
+      
+      const userIds = matchingUsers.map(user => user.user_id);
+      
+      // 创建复合查询条件：标题或内容包含搜索词，或者作者ID在匹配列表中
+      queryOptions.where = {
+        ...baseConditions,
+        [Op.or]: [
+          { title: { [Op.like]: `%${search}%` } },
+          { content: { [Op.like]: `%${search}%` } },
+          { user_id: { [Op.in]: userIds } }
+        ]
+      };
+    } else {
+      // 没有搜索内容时使用基本条件
+      queryOptions.where = baseConditions;
+    }
+
+    // 查询游记列表
+    const { count, rows: travelLogs } = await TravelLog.findAndCountAll(queryOptions);
     
     // 处理返回数据
     const simplifiedTravelLogs = travelLogs.map(log => {
