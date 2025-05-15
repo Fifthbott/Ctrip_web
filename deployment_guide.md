@@ -72,7 +72,20 @@ docker network connect ctrip-network nginx
 
 ### 5. 修改Nginx配置
 
-首先修改配置文件中的服务器IP：
+首先确保Nginx有正确的主配置文件：
+
+```bash
+# 复制主配置文件
+cp nginx/nginx.conf /etc/nginx/nginx.conf
+
+# 确保缓存目录存在
+mkdir -p /var/cache/nginx/api_cache
+mkdir -p /var/cache/nginx/download_cache
+chmod -R 755 /var/cache/nginx
+chown -R nginx:nginx /var/cache/nginx
+```
+
+然后修改配置文件中的服务器IP：
 
 ```bash
 # 复制配置文件模板

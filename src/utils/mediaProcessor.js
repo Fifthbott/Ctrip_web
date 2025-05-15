@@ -118,7 +118,7 @@ const processVideo = async (file, quickResponse = false) => {
     const processId = uuidv4();
     const uploadDir = path.join(process.cwd(), UPLOAD_PATH, 'videos');
     const tempDir = path.join(process.cwd(), UPLOAD_PATH, 'temp');
-    const coverDir = path.join(process.cwd(), UPLOAD_PATH, 'images'); // 封面存放在images目录
+    const coverDir = path.join(process.cwd(), UPLOAD_PATH, 'cover'); // 封面存放在cover目录
     
     // 确保目录存在
     [uploadDir, tempDir, coverDir].forEach(dir => {

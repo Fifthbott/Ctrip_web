@@ -27,21 +27,8 @@ const verifyToken = (token) => {
   }
 };
 
-/**
- * 从请求头中提取令牌
- * @param {Object} req - Express请求对象
- * @returns {string|null} 提取的令牌或null
- */
-const extractTokenFromHeader = (req) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  return authHeader.split(' ')[1];
-};
-
 module.exports = {
   generateToken,
   verifyToken,
-  extractTokenFromHeader
+
 }; 

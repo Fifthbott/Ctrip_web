@@ -1,9 +1,7 @@
 const { User } = require('../models');
 const { AppError } = require('../middleware/error');
 const { generateToken } = require('../utils/jwt');
-const { getFileUrl } = require('../utils/fileUpload');
 const { processAvatar } = require('../utils/mediaProcessor');
-const bcrypt = require('bcrypt');
 const path = require('path');
 const fs = require('fs');
 
@@ -253,40 +251,3 @@ exports.updateAvatar = async (req, res, next) => {
     next(error);
   }
 };
-
-/**
- * 获取用户列表（仅管理员）
- * @route GET /api/users
- */
-exports.getAllUsers = async (req, res, next) => {
-  try {
-    // 分页参数
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
-
-    // 查询用户列表
-    const { count, rows: users } = await User.findAndCountAll({
-      attributes: ['user_id', 'username', 'nickname', 'avatar', 'role', 'status', 'created_at'],
-      limit,
-      offset,
-      order: [['created_at', 'DESC']]
-    });
-
-    // 返回用户列表
-    res.status(200).json({
-      status: 'success',
-      data: {
-        users,
-        pagination: {
-          total: count,
-          page,
-          limit,
-          pages: Math.ceil(count / limit)
-        }
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-}; 

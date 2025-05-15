@@ -1,7 +1,7 @@
 const { Sequelize } = require('sequelize');
 const config = require('./config')[process.env.NODE_ENV || 'development'];
 
-// Create a Sequelize instance
+// 创建Sequelize实例
 const sequelize = new Sequelize(
   config.database,
   config.username,
@@ -16,14 +16,14 @@ const sequelize = new Sequelize(
   }
 );
 
-// Function to test the database connection
+// 测试数据库连接的函数
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
-    console.log('Database connection has been established successfully.');
+    console.log('数据库连接已成功建立。');
     return true;
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
+    console.error('无法连接到数据库:', error);
     return false;
   }
 };

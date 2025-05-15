@@ -9,6 +9,8 @@ const multer = require('multer');
 const { initDatabase } = require('./config/dbInit');
 const { responseMiddleware } = require('./utils/response');
 const { errorHandler, notFoundHandler } = require('./middleware/error');
+// 引入缓存中间件
+const { strongCache, conditionalRequest } = require('./middleware/cache');
 
 // 初始化Express应用
 const app = express();
@@ -91,15 +93,17 @@ app.use((req, res, next) => {
   }
 });
 
-// 请求体解析调试中间件
-app.use((req, res, next) => {
-  next();
-});
+// 静态文件服务 - 移除缓存中间件，由Nginx处理
+app.use('/public', express.static(path.join(__dirname, 'public'), {
+  etag: true,
+  lastModified: true
+}));
 
-// 静态文件服务
-app.use('/public', express.static(path.join(__dirname, 'public')));
-// 文件上传目录
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// 文件上传目录 - 移除缓存中间件，由Nginx处理
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  etag: true,
+  lastModified: true
+}));
 
 // API路由
 const userRoutes = require('./routes/userRoutes');

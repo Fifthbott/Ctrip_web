@@ -23,7 +23,8 @@ const User = sequelize.define('User', {
   nickname: {
     type: DataTypes.STRING(255),
     allowNull: false,
-    comment: '用户昵称'
+    unique: true,
+    comment: '用户昵称，唯一，不允许为空'
   },
   avatar: {
     type: DataTypes.STRING(255),
@@ -70,7 +71,7 @@ const User = sequelize.define('User', {
   }
 });
 
-// Instance method to compare passwords
+// 用于比较密码的实例方法
 User.prototype.comparePassword = async function(password) {
   return await bcrypt.compare(password, this.password_hash);
 };

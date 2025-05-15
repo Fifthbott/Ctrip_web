@@ -3,6 +3,8 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const { healthCheck } = require('../utils/health');
+// 引入缓存中间件
+const { strongCache, conditionalRequest } = require('../middleware/cache');
 
 /**
  * @route GET /
@@ -98,26 +100,55 @@ router.get('/api/download/:type/:filename', (req, res) => {
   const filePath = path.join(process.cwd(), 'src/uploads', type, filename);
   
   // 检查文件是否存在
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({
+  try {
+    const stat = fs.statSync(filePath);
+    
+    // 生成ETag和Last-Modified用于条件请求
+    const lastModified = stat.mtime.toUTCString();
+    const etag = `W/"${stat.size.toString(16)}-${stat.mtime.getTime().toString(16)}"`;
+    
+    // 获取请求头
+    const ifModifiedSince = req.headers['if-modified-since'];
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    // 条件请求处理
+    if ((ifNoneMatch && ifNoneMatch === etag) || 
+        (ifModifiedSince && new Date(ifModifiedSince) >= new Date(lastModified))) {
+      return res.status(304).end();
+    }
+    
+    // 只设置ETag和Last-Modified，缓存控制由Nginx处理
+    res.set({
+      'Last-Modified': lastModified,
+      'ETag': etag
+    });
+    
+    // 设置内容类型
+    const ext = path.extname(filename).substring(1).toLowerCase();
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'mp4': 'video/mp4',
+      'webm': 'video/webm',
+      'svg': 'image/svg+xml'
+    };
+    
+    if (mimeTypes[ext]) {
+      res.set('Content-Type', mimeTypes[ext]);
+    }
+    
+    // 发送文件
+    res.sendFile(filePath);
+  } catch (err) {
+    console.error('文件访问错误:', err);
+    res.status(404).json({
       status: 'error',
       message: '文件不存在'
     });
   }
-  
-  // 发送文件
-  res.download(filePath, filename, (err) => {
-    if (err) {
-      console.error('文件下载错误:', err);
-      // 如果头信息已发送，则无法发送错误响应
-      if (!res.headersSent) {
-        res.status(500).json({
-          status: 'error',
-          message: '文件下载失败'
-    });
-  }
-    }
-  });
 });
 
 module.exports = router; 

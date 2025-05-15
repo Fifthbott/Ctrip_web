@@ -45,10 +45,4 @@ router.get('/:id/comments', travelLogValidators.validateTravelLogId, commentCont
 router.put('/:id', travelLogValidators.validateTravelLogId, travelLogValidators.updateTravelLog, travelLogController.updateTravelLog);
 router.delete('/:id', travelLogValidators.validateTravelLogId, travelLogController.deleteTravelLog);
 
-// 互动（点赞、收藏）
-router.post('/:id/like', travelLogValidators.validateTravelLogId, interactionController.likeTravelLog);
-router.delete('/:id/like', travelLogValidators.validateTravelLogId, interactionController.unlikeTravelLog);
-router.post('/:id/favorite', travelLogValidators.validateTravelLogId, interactionController.favoriteTravelLog);
-router.delete('/:id/favorite', travelLogValidators.validateTravelLogId, interactionController.unfavoriteTravelLog);
-
 module.exports = router; 
